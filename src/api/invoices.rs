@@ -146,3 +146,12 @@ pub async fn create(
         axum::Json(conn.create_invoice(multipart.data.clone()).await?),
     ))
 }
+
+pub async fn list_all(
+    mut conn: DatabaseConnection
+) -> Result<(StatusCode, Json<Vec<PopulatedInvoice>>), Error> {
+    Ok((
+        StatusCode::OK,
+        axum::Json(conn.list_invoices().await?),
+    ))
+}

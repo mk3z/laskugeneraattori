@@ -3,6 +3,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use garde::Validate;
 
 use serde_derive::{Deserialize, Serialize};
+use diesel::prelude::*;
 
 // NOTES:
 // This is implemented based on https://github.com/Tietokilta/laskugeneraattori/blob/main/backend/src/procountor.rs#L293
@@ -24,7 +25,7 @@ pub enum InvoiceStatus {
 }
 
 /// A party of the invoice
-#[derive(Identifiable, Queryable, Clone, Debug, Serialize)]
+#[derive(Identifiable, Queryable, Selectable, Clone, Debug, Serialize)]
 #[diesel(table_name = parties)]
 pub struct Party {
     pub id: i32,
@@ -61,7 +62,8 @@ pub struct NewParty {
 }
 
 /// The invoice model as stored in the database
-#[derive(Identifiable, Queryable, Clone, Debug)]
+#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
+#[diesel(belongs_to(Party, foreign_key = counter_party_id))]
 #[diesel(table_name = invoices)]
 pub struct Invoice {
     pub id: i32,
@@ -81,7 +83,8 @@ pub struct NewInvoice {
 }
 
 /// A single row of an invoice
-#[derive(Identifiable, Queryable, Clone, Debug, Serialize)]
+#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug, Serialize)]
+#[diesel(belongs_to(Invoice))]
 #[diesel(table_name = invoice_rows)]
 pub struct InvoiceRow {
     #[serde(skip_serializing)]
@@ -110,7 +113,8 @@ pub struct NewInvoiceRow {
 /// The metadata for an invoice attachment
 /// The file itself can be requested using its hash and filename
 /// => /somepath/{hash}/{filename}
-#[derive(Identifiable, Queryable, Clone, Debug, Serialize)]
+#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug, Serialize)]
+#[diesel(belongs_to(Invoice))]
 #[diesel(table_name = invoice_attachments)]
 pub struct Attachment {
     #[serde(skip_serializing)]

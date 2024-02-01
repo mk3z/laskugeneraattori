@@ -11,6 +11,7 @@ pub fn app() -> Router<crate::database::State> {
     Router::new()
         .route("/health", get(health))
         .route("/invoices", post(invoices::create))
+        .route("/invoices", get(invoices::list_all))
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(

@@ -103,4 +103,45 @@ impl DatabaseConnection {
             attachments,
         })
     }
+    pub async fn list_invoices(&mut self) -> Result<Vec<PopulatedInvoice>, Error> {
+        let (invoices, parties): (Vec<Invoice>, Vec<Party>) = {
+            use crate::schema::parties;
+            use crate::schema::invoices;
+            invoices::table
+                .inner_join(parties::table)
+                .select((Invoice::as_select(), Party::as_select()))
+                .load::<(Invoice, Party)>(&mut self.0)
+                .await?
+                .into_iter()
+                .unzip()
+        };
+        let invoice_rows = InvoiceRow::belonging_to(&invoices)
+            .select(InvoiceRow::as_select())
+            .load(&mut self.0)
+            .await?
+            .grouped_by(&invoices);
+        let attachments = Attachment::belonging_to(&invoices)
+            .select(Attachment::as_select())
+            .load(&mut self.0)
+            .await?
+            .grouped_by(&invoices);
+        Ok(invoice_rows
+            .into_iter()
+            .zip(attachments)
+            .zip(invoices)
+            .zip(parties)
+            .map(|(((rows, attachments), invoice), party)| {
+                PopulatedInvoice {
+                    id: invoice.id,
+                    status: invoice.status,
+                    creation_time: invoice.creation_time,
+                    counter_party: party,
+                    rows,
+                    due_date: invoice.due_date,
+                    attachments,
+                }
+            })
+            .collect::<Vec<PopulatedInvoice>>()
+        )
+    }
 }
