@@ -2,8 +2,8 @@ use crate::schema::{invoice_attachments, invoice_rows, invoices, parties};
 use chrono::{DateTime, NaiveDate, Utc};
 use garde::Validate;
 
-use serde_derive::{Deserialize, Serialize};
 use diesel::prelude::*;
+use serde_derive::{Deserialize, Serialize};
 
 // NOTES:
 // This is implemented based on https://github.com/Tietokilta/laskugeneraattori/blob/main/backend/src/procountor.rs#L293

@@ -148,10 +148,7 @@ pub async fn create(
 }
 
 pub async fn list_all(
-    mut conn: DatabaseConnection
+    mut conn: DatabaseConnection,
 ) -> Result<(StatusCode, Json<Vec<PopulatedInvoice>>), Error> {
-    Ok((
-        StatusCode::OK,
-        axum::Json(conn.list_invoices().await?),
-    ))
+    Ok((StatusCode::OK, axum::Json(conn.list_invoices().await?)))
 }
