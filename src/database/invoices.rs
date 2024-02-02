@@ -2,6 +2,7 @@ use super::DatabaseConnection;
 use crate::api::invoices::{CreateInvoice, PopulatedInvoice};
 use crate::error::Error;
 use crate::models::*;
+use futures::TryStreamExt;
 
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
@@ -110,10 +111,17 @@ impl DatabaseConnection {
             invoices::table
                 .inner_join(parties::table)
                 .select((Invoice::as_select(), Party::as_select()))
-                .load::<(Invoice, Party)>(&mut self.0)
+                .load_stream::<(Invoice, Party)>(&mut self.0)
                 .await?
-                .into_iter()
-                .unzip()
+                .try_fold(
+                    (Vec::new(), Vec::new()),
+                    |(mut invoices, mut parties), (invoice, party)| {
+                        invoices.push(invoice);
+                        parties.push(party);
+                        futures::future::ready(Ok((invoices, parties)))
+                    },
+                )
+                .await?
         };
         let invoice_rows = InvoiceRow::belonging_to(&invoices)
             .select(InvoiceRow::as_select())
