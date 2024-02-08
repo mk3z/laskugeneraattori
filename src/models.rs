@@ -15,7 +15,7 @@ use serde_derive::{Deserialize, Serialize};
 // - Is VAT really necessary to account for? I'm leaving it out for now
 // - I'm also leaving InvoiceType out, at least for now
 
-#[derive(diesel_derive_enum::DbEnum, Debug, Clone, Copy, Serialize)]
+#[derive(diesel_derive_enum::DbEnum, Debug, Clone, Copy, Serialize, Deserialize)]
 #[ExistingTypePath = "crate::schema::sql_types::InvoiceStatus"]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum InvoiceStatus {
@@ -25,7 +25,7 @@ pub enum InvoiceStatus {
 }
 
 /// A party of the invoice
-#[derive(Identifiable, Queryable, Selectable, Clone, Debug, Serialize)]
+#[derive(Identifiable, Queryable, Selectable, Clone, Debug, Serialize, Deserialize)]
 #[diesel(table_name = parties)]
 pub struct Party {
     pub id: i32,
@@ -83,13 +83,15 @@ pub struct NewInvoice {
 }
 
 /// A single row of an invoice
-#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug, Serialize)]
+#[derive(
+    Identifiable, Queryable, Selectable, Associations, Clone, Debug, Serialize, Deserialize,
+)]
 #[diesel(belongs_to(Invoice))]
 #[diesel(table_name = invoice_rows)]
 pub struct InvoiceRow {
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub id: i32,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub invoice_id: i32,
     /// The product can be at most 128 characters
     pub product: String,
@@ -113,13 +115,15 @@ pub struct NewInvoiceRow {
 /// The metadata for an invoice attachment
 /// The file itself can be requested using its hash and filename
 /// => /somepath/{hash}/{filename}
-#[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug, Serialize)]
+#[derive(
+    Identifiable, Queryable, Selectable, Associations, Clone, Debug, Serialize, Deserialize,
+)]
 #[diesel(belongs_to(Invoice))]
 #[diesel(table_name = invoice_attachments)]
 pub struct Attachment {
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub id: i32,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub invoice_id: i32,
     /// The filename can be at most 128 characters
     pub filename: String,

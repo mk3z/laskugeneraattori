@@ -79,7 +79,7 @@ pub struct CreateInvoiceAttachment {
 }
 
 /// A populated invoice type that is returned to the user
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PopulatedInvoice {
     pub id: i32,
     pub status: crate::models::InvoiceStatus,
