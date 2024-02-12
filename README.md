@@ -6,7 +6,7 @@ The application is based on [axum](https://github.com/tokio-rs/axum):
 ## Features/TODO:
 * [x] create invoice + validation
 * [ ] create user + authentication
-* [ ] list invoices
+* [x] list invoices
 * [ ] edit invoice
 * [ ] ratelimits
 * [ ] generate pdf

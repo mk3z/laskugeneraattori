@@ -2,6 +2,7 @@ use super::DatabaseConnection;
 use crate::api::invoices::{CreateInvoice, PopulatedInvoice};
 use crate::error::Error;
 use crate::models::*;
+use futures::TryStreamExt;
 
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
@@ -102,5 +103,50 @@ impl DatabaseConnection {
             due_date: created.due_date,
             attachments,
         })
+    }
+    pub async fn list_invoices(&mut self) -> Result<Vec<PopulatedInvoice>, Error> {
+        let (invoices, parties): (Vec<Invoice>, Vec<Party>) = {
+            use crate::schema::invoices;
+            use crate::schema::parties;
+            invoices::table
+                .inner_join(parties::table)
+                .select((Invoice::as_select(), Party::as_select()))
+                .load_stream::<(Invoice, Party)>(&mut self.0)
+                .await?
+                .try_fold(
+                    (Vec::new(), Vec::new()),
+                    |(mut invoices, mut parties), (invoice, party)| {
+                        invoices.push(invoice);
+                        parties.push(party);
+                        futures::future::ready(Ok((invoices, parties)))
+                    },
+                )
+                .await?
+        };
+        let invoice_rows = InvoiceRow::belonging_to(&invoices)
+            .select(InvoiceRow::as_select())
+            .load(&mut self.0)
+            .await?
+            .grouped_by(&invoices);
+        let attachments = Attachment::belonging_to(&invoices)
+            .select(Attachment::as_select())
+            .load(&mut self.0)
+            .await?
+            .grouped_by(&invoices);
+        Ok(invoice_rows
+            .into_iter()
+            .zip(attachments)
+            .zip(invoices)
+            .zip(parties)
+            .map(|(((rows, attachments), invoice), party)| PopulatedInvoice {
+                id: invoice.id,
+                status: invoice.status,
+                creation_time: invoice.creation_time,
+                counter_party: party,
+                rows,
+                due_date: invoice.due_date,
+                attachments,
+            })
+            .collect::<Vec<PopulatedInvoice>>())
     }
 }

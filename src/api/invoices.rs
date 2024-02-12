@@ -79,7 +79,7 @@ pub struct CreateInvoiceAttachment {
 }
 
 /// A populated invoice type that is returned to the user
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PopulatedInvoice {
     pub id: i32,
     pub status: crate::models::InvoiceStatus,
@@ -145,4 +145,8 @@ pub async fn create(
         StatusCode::CREATED,
         axum::Json(conn.create_invoice(multipart.data.clone()).await?),
     ))
+}
+
+pub async fn list_all(mut conn: DatabaseConnection) -> Result<Json<Vec<PopulatedInvoice>>, Error> {
+    Ok(axum::Json(conn.list_invoices().await?))
 }
