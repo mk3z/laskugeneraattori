@@ -14,9 +14,6 @@ mod schema;
 mod tests;
 
 #[macro_use]
-extern crate diesel;
-
-#[macro_use]
 extern crate tracing;
 
 #[tokio::main]
