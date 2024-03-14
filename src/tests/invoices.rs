@@ -1,14 +1,32 @@
+use std::sync::Once;
+
 use crate::api::app;
 use crate::api::invoices::{CreateInvoice, CreateInvoiceRow, PopulatedInvoice};
 use crate::models::NewAddress;
 
 use axum::http::StatusCode;
+use axum::Router;
 use axum_test::multipart::MultipartForm;
 use axum_test::TestServer;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::EnvFilter;
 
+static INIT: Once = Once::new();
+async fn test_init() -> Router {
+    INIT.call_once(|| {
+        tracing_subscriber::registry()
+            .with::<EnvFilter>(
+                "laskugeneraattori=debug,tower_http=debug,axum::rejection=trace".into(),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init()
+    });
+    app().with_state(crate::database::new().await)
+}
 #[tokio::test]
 async fn create() {
-    let app = app().with_state(crate::database::new().await);
+    let app = test_init().await;
 
     let body = CreateInvoice {
         rows: vec![
@@ -52,7 +70,7 @@ async fn create() {
 
 #[tokio::test]
 async fn list_all() {
-    let app = app().with_state(crate::database::new().await);
+    let app = test_init().await;
     let server = TestServer::new(app).unwrap();
 
     let response = server.get("/invoices").await;
@@ -61,7 +79,7 @@ async fn list_all() {
 
 #[tokio::test]
 async fn create_list_all() {
-    let app = app().with_state(crate::database::new().await);
+    let app = test_init().await;
 
     let body = CreateInvoice {
         recipient_name: "Velkoja".into(),
