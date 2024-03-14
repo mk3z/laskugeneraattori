@@ -2,17 +2,17 @@ use super::DatabaseConnection;
 use crate::api::invoices::{CreateInvoice, PopulatedInvoice};
 use crate::error::Error;
 use crate::models::*;
-use futures::TryStreamExt;
 
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
 impl DatabaseConnection {
-    pub async fn create_party(&mut self, party: &NewParty) -> Result<Party, Error> {
-        use crate::schema::parties::dsl::*;
+    /// create an address, returning an id of the address, either
+    pub async fn create_address(&mut self, address: &NewAddress) -> Result<i32, Error> {
+        use crate::schema::addresses::dsl::*;
 
-        diesel::insert_into(parties)
-            .values(party)
+        diesel::insert_into(addresses)
+            .values(address)
             .on_conflict(diesel::upsert::on_constraint("no_duplicates"))
             .do_nothing()
             .execute(&mut self.0)
@@ -20,15 +20,15 @@ impl DatabaseConnection {
 
         // NOTE: Diesel is dumb so we have to requery for the data
         // because on_conflict() doesn't support returning()
-        Ok(parties
+        Ok(addresses
+            .select(id)
             .filter(
-                name.eq(&party.name)
-                    .and(street.eq(&party.street))
-                    .and(city.eq(&party.city))
-                    .and(zip.eq(&party.zip))
-                    .and(bank_account.eq(&party.bank_account)),
+                street
+                    .eq(&address.street)
+                    .and(city.eq(&address.city))
+                    .and(zip.eq(&address.zip)),
             )
-            .first::<Party>(&mut self.0)
+            .first::<i32>(&mut self.0)
             .await?)
     }
 
@@ -36,16 +36,18 @@ impl DatabaseConnection {
         &mut self,
         invoice: CreateInvoice,
     ) -> Result<PopulatedInvoice, Error> {
-        let party = self.create_party(&invoice.counter_party).await?;
+        let address_id = self.create_address(&invoice.address).await?;
 
+        // TODO: this could (but should it is totally another question) be done with an impl for CreateInvoice,
+        // as this is the only thing CreateInvoice is used for
         let inv = NewInvoice {
-            status: InvoiceStatus::Open,
-            counter_party_id: party.id,
-            creation_time: chrono::Utc::now(),
-            due_date: invoice.due_date,
+            address_id,
+            recipient_name: invoice.recipient_name,
+            recipient_email: invoice.recipient_email,
+            bank_account_number: invoice.bank_account_number,
         };
 
-        let created = {
+        let created_invoice = {
             use crate::schema::invoices::dsl::*;
             diesel::insert_into(invoices)
                 .values(&inv)
@@ -62,7 +64,7 @@ impl DatabaseConnection {
                         .rows
                         .into_iter()
                         .map(|r| NewInvoiceRow {
-                            invoice_id: created.id,
+                            invoice_id: created_invoice.id,
                             product: r.product,
                             quantity: r.quantity,
                             unit: r.unit,
@@ -83,7 +85,7 @@ impl DatabaseConnection {
                         .attachments
                         .into_iter()
                         .map(|a| NewAttachment {
-                            invoice_id: created.id,
+                            invoice_id: created_invoice.id,
                             hash: a.hash,
                             filename: a.filename,
                         })
@@ -94,41 +96,21 @@ impl DatabaseConnection {
                 .await?
         };
 
-        Ok(PopulatedInvoice {
-            id: created.id,
-            status: created.status,
-            creation_time: created.creation_time,
-            counter_party: party,
-            rows,
-            due_date: created.due_date,
-            attachments,
-        })
+        Ok(created_invoice.into_populated(rows, attachments))
     }
     pub async fn list_invoices(&mut self) -> Result<Vec<PopulatedInvoice>, Error> {
-        let (invoices, parties): (Vec<Invoice>, Vec<Party>) = {
-            use crate::schema::invoices;
-            use crate::schema::parties;
-            invoices::table
-                .inner_join(parties::table)
-                .select((Invoice::as_select(), Party::as_select()))
-                .load_stream::<(Invoice, Party)>(&mut self.0)
-                .await?
-                .try_fold(
-                    (Vec::new(), Vec::new()),
-                    |(mut invoices, mut parties), (invoice, party)| {
-                        invoices.push(invoice);
-                        parties.push(party);
-                        futures::future::ready(Ok((invoices, parties)))
-                    },
-                )
-                .await?
-        };
-        let invoice_rows = InvoiceRow::belonging_to(&invoices)
+        use crate::schema::invoices;
+        let invoices = invoices::table
+            .select(Invoice::as_select())
+            .load(&mut self.0)
+            .await?;
+
+        let invoice_rows: Vec<Vec<_>> = InvoiceRow::belonging_to(&invoices)
             .select(InvoiceRow::as_select())
             .load(&mut self.0)
             .await?
             .grouped_by(&invoices);
-        let attachments = Attachment::belonging_to(&invoices)
+        let attachments: Vec<Vec<_>> = Attachment::belonging_to(&invoices)
             .select(Attachment::as_select())
             .load(&mut self.0)
             .await?
@@ -137,16 +119,7 @@ impl DatabaseConnection {
             .into_iter()
             .zip(attachments)
             .zip(invoices)
-            .zip(parties)
-            .map(|(((rows, attachments), invoice), party)| PopulatedInvoice {
-                id: invoice.id,
-                status: invoice.status,
-                creation_time: invoice.creation_time,
-                counter_party: party,
-                rows,
-                due_date: invoice.due_date,
-                attachments,
-            })
+            .map(|((rows, attachments), invoice)| invoice.into_populated(rows, attachments))
             .collect::<Vec<PopulatedInvoice>>())
     }
 }

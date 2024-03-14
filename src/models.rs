@@ -1,5 +1,8 @@
-use crate::schema::{invoice_attachments, invoice_rows, invoices, parties};
-use chrono::{DateTime, NaiveDate, Utc};
+use crate::{
+    api::invoices::PopulatedInvoice,
+    schema::{addresses, invoice_attachments, invoice_rows, invoices},
+};
+use chrono::{DateTime, Utc};
 use garde::Validate;
 
 use diesel::prelude::*;
@@ -7,13 +10,23 @@ use serde_derive::{Deserialize, Serialize};
 
 // NOTES:
 // This is implemented based on https://github.com/Tietokilta/laskugeneraattori/blob/main/backend/src/procountor.rs#L293
-// major changes are justified below:
-// - I think PaymentInfo and Party can be joined into one struct/field
-//  => due date is moved to the Invoice struct
-// - I deem the inclusion of currencies or payment methods unnecessary for now
-// - I don't think having a massive enum for product units is necessary, just have it as string :D
-// - Is VAT really necessary to account for? I'm leaving it out for now
-// - I'm also leaving InvoiceType out, at least for now
+//
+// InvoiceRow: Is VAT really necessary to account for? TODO(?)
+// Invoice: due date TODO:
+//   this is not prio 1, but implementation idea:
+//   when creating new invoice is set to NULL, as we don't know if the invoice is valid
+//   Set to date X when the treasurer accepts this invoice
+//   the open question is: What is the date X? Have to coordinate with treasurer / is this even necessary
+// - Having a massive enum for product units is necessary, just have it as string :D
+// As one recipient has to be able to:
+// - have different emails
+// - have different addresses
+// - have different bank account for payment
+// - have different names even? ¯\_(ツ)_/¯
+// It would involve creating a quite overcomplicated schema with multiple many-to-many relations for not that much of benefit
+// as this is anyways a free fill form where people can spam whatever information.
+// if there were to be any stronger authentication (guild auth?) then this would change (read: not in the near future.)
+// Invoices table with recipient name, email and account number
 
 #[derive(diesel_derive_enum::DbEnum, Debug, Clone, Copy, Serialize, Deserialize)]
 #[ExistingTypePath = "crate::schema::sql_types::InvoiceStatus"]
@@ -22,64 +35,63 @@ pub enum InvoiceStatus {
     Open,
     Accepted,
     Paid,
+    Cancelled,
 }
-
-/// A party of the invoice
-#[derive(Identifiable, Queryable, Selectable, Clone, Debug, Serialize, Deserialize)]
-#[diesel(table_name = parties)]
-pub struct Party {
+#[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
+#[diesel(table_name = addresses)]
+pub struct Address {
     pub id: i32,
-    /// The name can be at most 128 characters
-    pub name: String,
-    /// The street can be at most 128 characters
+    /// The street address can be at most 128 characters
     pub street: String,
     /// The city can be at most 128 characters
     pub city: String,
     /// The zipcode can be at most 128 characters (:D)
     pub zip: String,
-    /// The bank_account can be at most 128 characters
-    pub bank_account: String,
 }
-
 #[derive(Insertable, Debug, Clone, Serialize, Deserialize, Validate)]
-#[diesel(table_name = parties)]
-pub struct NewParty {
-    /// The name can be at most 128 characters
-    #[garde(byte_length(max = 128))]
-    pub name: String,
-    /// The street can be at most 128 characters
+#[diesel(table_name=addresses)]
+pub struct NewAddress {
     #[garde(byte_length(max = 128))]
     pub street: String,
-    /// The city can be at most 128 characters
     #[garde(byte_length(max = 128))]
     pub city: String,
-    /// The zipcode can be at most 128 characters (:D)
     #[garde(byte_length(max = 128))]
     pub zip: String,
-    /// The bank_account can be at most 128 characters
-    #[garde(byte_length(max = 128))]
-    pub bank_account: String,
 }
-
 /// The invoice model as stored in the database
 #[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
-#[diesel(belongs_to(Party, foreign_key = counter_party_id))]
+#[diesel(belongs_to(Address))]
 #[diesel(table_name = invoices)]
 pub struct Invoice {
     pub id: i32,
     pub status: InvoiceStatus,
     pub creation_time: DateTime<Utc>,
-    pub counter_party_id: i32,
-    pub due_date: NaiveDate,
+    // TODO: see NOTES above
+    // pub due_date:Option<NaiveDate>,
+    /// invoice recipient's name can be at most 128 characters
+    pub recipient_name: String,
+    /// invoice recipient's email can be at most 128 characters
+    pub recipient_email: String,
+    /// A back account number can be at most 128 characters
+    pub bank_account_number: String,
+    pub address_id: i32,
 }
-
+impl Invoice {
+    pub fn into_populated(
+        self,
+        rows: Vec<InvoiceRow>,
+        attachments: Vec<Attachment>,
+    ) -> PopulatedInvoice {
+        PopulatedInvoice::new(self, rows, attachments)
+    }
+}
 #[derive(Insertable)]
 #[diesel(table_name = invoices)]
 pub struct NewInvoice {
-    pub status: InvoiceStatus,
-    pub creation_time: DateTime<Utc>,
-    pub counter_party_id: i32,
-    pub due_date: NaiveDate,
+    pub address_id: i32,
+    pub recipient_name: String,
+    pub recipient_email: String,
+    pub bank_account_number: String,
 }
 
 /// A single row of an invoice

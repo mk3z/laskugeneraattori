@@ -1,11 +1,12 @@
 use crate::database::DatabaseConnection;
 use crate::error::Error;
+use crate::models::{Attachment, Invoice, InvoiceRow};
 use axum::{async_trait, body::Bytes, http::StatusCode, Json};
 use axum_typed_multipart::{
     FieldData, FieldMetadata, TryFromChunks, TryFromMultipart, TypedMultipart, TypedMultipartError,
 };
 use axum_valid::Garde;
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Utc};
 use futures::stream::Stream;
 use futures::stream::{self, TryStreamExt};
 use garde::Validate;
@@ -28,14 +29,19 @@ impl TryFromChunks for CreateInvoice {
 /// Body for the request for creating new invoices
 #[derive(Clone, Debug, Serialize, Deserialize, Validate)]
 pub struct CreateInvoice {
-    /// The other party of the invoice
+    /// The recipient's name
+    #[garde(byte_length(max = 128))]
+    pub recipient_name: String,
+    /// The recipient's email
+    #[garde(byte_length(max = 128))]
+    pub recipient_email: String,
+    /// The recipient's address
     #[garde(dive)]
-    pub counter_party: crate::models::NewParty,
-    /// The due date of the invoice.
-    /// It cannot be in the past
-    //TODO: #[garde(time(op = after_now))]
-    #[garde(skip)]
-    pub due_date: NaiveDate,
+    pub address: crate::models::NewAddress,
+    /// The recipient's bank account number
+    // TODO: maybe validate with https://crates.io/crates/iban_validate/
+    #[garde(byte_length(max = 128))]
+    pub bank_account_number: String,
     /// The rows of the invoice
     #[garde(length(min = 1), dive)]
     pub rows: Vec<CreateInvoiceRow>,
@@ -84,10 +90,25 @@ pub struct PopulatedInvoice {
     pub id: i32,
     pub status: crate::models::InvoiceStatus,
     pub creation_time: DateTime<Utc>,
-    pub due_date: NaiveDate,
-    pub counter_party: crate::models::Party,
+    pub recipient_name: String,
+    pub recipient_email: String,
+    pub bank_account_number: String,
     pub rows: Vec<crate::models::InvoiceRow>,
     pub attachments: Vec<crate::models::Attachment>,
+}
+impl PopulatedInvoice {
+    pub fn new(invoice: Invoice, rows: Vec<InvoiceRow>, attachments: Vec<Attachment>) -> Self {
+        Self {
+            id: invoice.id,
+            status: invoice.status,
+            creation_time: invoice.creation_time,
+            recipient_name: invoice.recipient_name,
+            recipient_email: invoice.recipient_email,
+            bank_account_number: invoice.bank_account_number,
+            rows,
+            attachments,
+        }
+    }
 }
 
 async fn try_handle_file(field: &FieldData<Bytes>) -> Result<CreateInvoiceAttachment, Error> {

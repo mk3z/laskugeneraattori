@@ -7,6 +7,18 @@ pub mod sql_types {
 }
 
 diesel::table! {
+    addresses (id) {
+        id -> Int4,
+        #[max_length = 128]
+        street -> Varchar,
+        #[max_length = 128]
+        city -> Varchar,
+        #[max_length = 128]
+        zip -> Varchar,
+    }
+}
+
+diesel::table! {
     invoice_attachments (id) {
         id -> Int4,
         invoice_id -> Int4,
@@ -38,34 +50,23 @@ diesel::table! {
         id -> Int4,
         status -> InvoiceStatus,
         creation_time -> Timestamptz,
-        counter_party_id -> Int4,
-        due_date -> Date,
-    }
-}
-
-diesel::table! {
-    parties (id) {
-        id -> Int4,
         #[max_length = 128]
-        name -> Varchar,
+        recipient_name -> Varchar,
         #[max_length = 128]
-        street -> Varchar,
+        recipient_email -> Varchar,
         #[max_length = 128]
-        city -> Varchar,
-        #[max_length = 128]
-        zip -> Varchar,
-        #[max_length = 128]
-        bank_account -> Varchar,
+        bank_account_number -> Varchar,
+        address_id -> Int4,
     }
 }
 
 diesel::joinable!(invoice_attachments -> invoices (invoice_id));
 diesel::joinable!(invoice_rows -> invoices (invoice_id));
-diesel::joinable!(invoices -> parties (counter_party_id));
+diesel::joinable!(invoices -> addresses (address_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    addresses,
     invoice_attachments,
     invoice_rows,
     invoices,
-    parties,
 );

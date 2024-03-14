@@ -1,6 +1,6 @@
 use crate::api::app;
 use crate::api::invoices::{CreateInvoice, CreateInvoiceRow, PopulatedInvoice};
-use crate::models::NewParty;
+use crate::models::NewAddress;
 
 use axum::http::StatusCode;
 use axum_test::multipart::MultipartForm;
@@ -11,14 +11,6 @@ async fn create() {
     let app = app().with_state(crate::database::new().await);
 
     let body = CreateInvoice {
-        counter_party: NewParty {
-            name: String::from("Velkoja"),
-            street: String::from("Otakaari"),
-            city: String::from("Espoo"),
-            zip: String::from("02jotain"),
-            bank_account: String::from("ei ole"),
-        },
-        due_date: chrono::Local::now().date_naive(),
         rows: vec![
             CreateInvoiceRow {
                 product: String::from("pleikkari"),
@@ -40,6 +32,14 @@ async fn create() {
             },
         ],
         attachments: vec![],
+        recipient_name: "Velkoja".into(),
+        recipient_email: "velkoja@velat.com".into(),
+        address: NewAddress {
+            street: "Otakaari 18A 69".into(),
+            city: "Espoo".into(),
+            zip: "02jotain".into(),
+        },
+        bank_account_number: "ei ole".into(),
     };
 
     let body = MultipartForm::new().add_text("data", serde_json::to_string(&body).unwrap());
@@ -64,14 +64,14 @@ async fn create_list_all() {
     let app = app().with_state(crate::database::new().await);
 
     let body = CreateInvoice {
-        counter_party: NewParty {
-            name: String::from("Velkoja"),
-            street: String::from("Otakaari"),
-            city: String::from("Espoo"),
-            zip: String::from("02jotain"),
-            bank_account: String::from("ei ole"),
+        recipient_name: "Velkoja".into(),
+        recipient_email: "velkoja@velat.com".into(),
+        address: NewAddress {
+            street: "Otakaari 18A 69".into(),
+            city: "Espoo".into(),
+            zip: "02jotain".into(),
         },
-        due_date: chrono::Local::now().date_naive(),
+        bank_account_number: "ei ole".into(),
         rows: vec![
             CreateInvoiceRow {
                 product: String::from("pleikkari"),
