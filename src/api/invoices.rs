@@ -221,7 +221,6 @@ pub async fn send_mail(invoice: &PopulatedInvoice) -> Result<(), Error> {
         .try_fold(form, |form, attachment| {
             let path = std::env::var("ATTACHMENT_PATH").unwrap_or(String::from("."));
             let path = std::path::Path::new(&path).join(&attachment.hash);
-            dbg!(&path);
             let bytes = std::fs::read(path)?;
             Ok::<reqwest::multipart::Form, Error>(form.part(
                 "attachment",
