@@ -142,8 +142,10 @@ async fn try_handle_file(field: &FieldData<Bytes>) -> Result<CreateInvoiceAttach
         .to_string();
 
     let cont = field.contents.clone();
-    // NOTE: Avoid blocking the entire tokio runtime
-    let hash = tokio_rayon::spawn_fifo(move || hex::encode(Sha256::digest(&cont))).await;
+    let hash = tokio::task::spawn_blocking(move || hex::encode(Sha256::digest(&cont)))
+        .await
+        .unwrap();
+
     let file_path = format!(
         "{}/{hash}",
         std::env::var("ATTACHMENT_PATH").unwrap_or(String::from("."))

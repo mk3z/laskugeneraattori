@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Luukas Pörtfors <lajp@iki.fi>"]
 
+[profile.release]
+lto = true
+
 [features]
 default = ["pdfgen"]
 pdfgen = ["dep:typst", "dep:typst-pdf", "dep:comemo", "dep:time", "dep:typst-assets", "dep:tempdir"]
@@ -33,7 +36,6 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 serde_json = "1.0.111"
 futures = "0.3.30"
 garde = "0.17.0"
-tokio-rayon = "2.1.0"
 typst = { version = "0.11.1", optional = true }
 typst-pdf = { version = "0.11.1", optional = true }
 comemo = { version = "0.4.0", optional = true }
