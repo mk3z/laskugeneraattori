@@ -195,3 +195,52 @@ pub async fn create(
 pub async fn list_all(mut conn: DatabaseConnection) -> Result<Json<Vec<PopulatedInvoice>>, Error> {
     Ok(axum::Json(conn.list_invoices().await?))
 }
+
+#[allow(dead_code)]
+pub async fn send_mail(invoice: &PopulatedInvoice) -> Result<(), Error> {
+    let client = reqwest::Client::new();
+    let form = reqwest::multipart::Form::new()
+        .text(
+            "from",
+            std::env::var("MAILGUN_FROM").unwrap_or(String::from("")),
+        )
+        .text(
+            "to",
+            format!("{} <{}>", invoice.recipient_name, invoice.recipient_email),
+        )
+        .text(
+            "to",
+            std::env::var("MAILGUN_TO").unwrap_or(String::from("")),
+        )
+        .text("subject", format!("Uusi lasku #{}", invoice.id))
+        .text("html", format!("Uusi lasku #{}", invoice.id));
+
+    let form = invoice
+        .attachments
+        .iter()
+        .try_fold(form, |form, attachment| {
+            let path = std::env::var("ATTACHMENT_PATH").unwrap_or(String::from("."));
+            let path = std::path::Path::new(&path).join(&attachment.hash);
+            dbg!(&path);
+            let bytes = std::fs::read(path)?;
+            Ok::<reqwest::multipart::Form, Error>(form.part(
+                "attachment",
+                reqwest::multipart::Part::bytes(bytes).file_name(attachment.filename.clone()),
+            ))
+        })?;
+
+    let response = client
+        .post(std::env::var("MAILGUN_URL").unwrap_or(String::from("")))
+        .basic_auth(
+            std::env::var("MAILGUN_USER").unwrap_or(String::from("")),
+            Some(std::env::var("MAILGUN_PASSWORD").unwrap_or(String::from(""))),
+        )
+        .multipart(form)
+        .send()
+        .await?;
+
+    match response.error_for_status() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::ReqwestError(e)),
+    }
+}

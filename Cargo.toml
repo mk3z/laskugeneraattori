@@ -9,14 +9,25 @@ lto = true
 
 [features]
 default = ["pdfgen"]
-pdfgen = ["dep:typst", "dep:typst-pdf", "dep:comemo", "dep:time", "dep:typst-assets", "dep:tempdir"]
+pdfgen = [
+    "dep:typst",
+    "dep:typst-pdf",
+    "dep:comemo",
+    "dep:time",
+    "dep:typst-assets",
+    "dep:tempdir",
+]
 system_fonts = ["dep:fontdb"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 axum = { version = "0.7.4", features = ["macros", "multipart"] }
-axum-valid = { version = "0.14.0", features = ["basic", "garde", "typed_multipart"], default-features = false }
+axum-valid = { version = "0.14.0", features = [
+    "basic",
+    "garde",
+    "typed_multipart",
+], default-features = false }
 axum_typed_multipart = "0.11.0"
 bb8 = "0.8.1"
 chrono = { version = "0.4.31", features = ["serde"] }
@@ -43,6 +54,8 @@ time = { version = "0.3.36", optional = true }
 fontdb = { version = "0.17.0", optional = true }
 typst-assets = { version = "0.11.1", features = ["fonts"], optional = true }
 tempdir = { version = "0.3.7", optional = true }
+tokio-rayon = "2.1.0"
+reqwest = { version = "0.12.5", features = ["multipart"] }
 
 [dev-dependencies]
 tower = { version = "0.4.13", features = ["util"] }

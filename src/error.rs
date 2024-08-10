@@ -13,6 +13,8 @@ pub enum Error {
     PoolError(#[from] bb8::RunError<PoolError>),
     #[error("Diesel error {0}")]
     DieselError(#[from] diesel::result::Error),
+    #[error("Reqwest error {0}")]
+    ReqwestError(#[from] reqwest::Error),
     #[error("Error while parsing multipart form")]
     MultipartError(#[from] axum::extract::multipart::MultipartError),
     #[error("Error in handling multipart request")]
@@ -42,9 +44,10 @@ impl IntoResponse for Error {
         error!(%self);
 
         let status = match self {
-            Error::PoolError(_) | Error::DieselError(_) | Error::InternalServerError(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            Error::PoolError(_)
+            | Error::DieselError(_)
+            | Error::InternalServerError(_)
+            | Error::ReqwestError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::JsonError(_)
             | Error::MissingFilename
             | Error::MultipartError(_)
