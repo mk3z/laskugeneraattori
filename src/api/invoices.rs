@@ -1,22 +1,17 @@
-use crate::database::DatabaseConnection;
 use crate::error::Error;
 use crate::mailgun::MailgunClient;
-use crate::models::{Address, Attachment, Invoice, InvoiceRow};
 use axum::{async_trait, body::Bytes, http::StatusCode, Json};
 use axum_typed_multipart::{
     FieldData, FieldMetadata, TryFromChunks, TryFromMultipart, TypedMultipart, TypedMultipartError,
 };
 use axum_valid::Garde;
-use chrono::{DateTime, Utc};
 use futures::stream::Stream;
 use futures::stream::{self, TryStreamExt};
 use garde::Validate;
 use serde_derive::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use tokio::io::AsyncWriteExt;
 
 #[async_trait]
-impl TryFromChunks for CreateInvoice {
+impl TryFromChunks for Invoice {
     async fn try_from_chunks(
         chunks: impl Stream<Item = Result<Bytes, TypedMultipartError>> + Send + Sync + Unpin,
         metadata: FieldMetadata,
@@ -27,9 +22,19 @@ impl TryFromChunks for CreateInvoice {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct Address {
+    #[garde(byte_length(max = 128))]
+    pub street: String,
+    #[garde(byte_length(max = 128))]
+    pub city: String,
+    #[garde(byte_length(max = 128))]
+    pub zip: String,
+}
+
 /// Body for the request for creating new invoices
 #[derive(Clone, Debug, Serialize, Deserialize, Validate)]
-pub struct CreateInvoice {
+pub struct Invoice {
     /// The recipient's name
     #[garde(byte_length(max = 128))]
     pub recipient_name: String,
@@ -38,7 +43,7 @@ pub struct CreateInvoice {
     pub recipient_email: String,
     /// The recipient's address
     #[garde(dive)]
-    pub address: crate::models::NewAddress,
+    pub address: Address,
     /// The recipient's bank account number
     // TODO: maybe validate with https://crates.io/crates/iban_validate/
     #[garde(byte_length(max = 128))]
@@ -53,17 +58,17 @@ pub struct CreateInvoice {
     pub attachment_descriptions: Vec<String>,
     /// The rows of the invoice
     #[garde(length(min = 1), dive)]
-    pub rows: Vec<CreateInvoiceRow>,
+    pub rows: Vec<InvoiceRow>,
     // NOTE: We get the attachments from the multipart form
     #[garde(skip)]
     #[serde(skip_deserializing)]
-    pub attachments: Vec<CreateInvoiceAttachment>,
+    pub attachments: Vec<InvoiceAttachment>,
 }
 
 #[derive(TryFromMultipart, Validate)]
-pub struct CreateInvoiceForm {
+pub struct InvoiceForm {
     #[garde(dive)]
-    pub data: CreateInvoice,
+    pub data: Invoice,
     // FIXME: Maybe use NamedTempFile
     #[garde(skip)]
     #[form_data(limit = "unlimited")]
@@ -71,7 +76,7 @@ pub struct CreateInvoiceForm {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Validate)]
-pub struct CreateInvoiceRow {
+pub struct InvoiceRow {
     /// The product can be at most 128 characters
     #[garde(byte_length(max = 128))]
     pub product: String,
@@ -88,53 +93,12 @@ pub struct CreateInvoiceRow {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreateInvoiceAttachment {
+pub struct InvoiceAttachment {
     pub filename: String,
-    pub hash: String,
+    pub bytes: Vec<u8>,
 }
 
-/// A populated invoice type that is returned to the user
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PopulatedInvoice {
-    pub id: i32,
-    pub status: crate::models::InvoiceStatus,
-    pub creation_time: DateTime<Utc>,
-    pub recipient_name: String,
-    pub recipient_email: String,
-    pub bank_account_number: String,
-    pub phone_number: String,
-    pub subject: String,
-    pub description: String,
-    pub address: Address,
-    pub rows: Vec<InvoiceRow>,
-    pub attachments: Vec<Attachment>,
-}
-
-impl PopulatedInvoice {
-    pub fn new(
-        invoice: Invoice,
-        address: Address,
-        rows: Vec<InvoiceRow>,
-        attachments: Vec<Attachment>,
-    ) -> Self {
-        Self {
-            id: invoice.id,
-            status: invoice.status,
-            creation_time: invoice.creation_time,
-            recipient_name: invoice.recipient_name,
-            recipient_email: invoice.recipient_email,
-            phone_number: invoice.phone_number,
-            subject: invoice.subject,
-            description: invoice.description,
-            address,
-            bank_account_number: invoice.bank_account_number,
-            rows,
-            attachments,
-        }
-    }
-}
-
-async fn try_handle_file(field: &FieldData<Bytes>) -> Result<CreateInvoiceAttachment, Error> {
+async fn try_handle_file(field: &FieldData<Bytes>) -> Result<InvoiceAttachment, Error> {
     let filename = field
         .metadata
         .file_name
@@ -142,37 +106,17 @@ async fn try_handle_file(field: &FieldData<Bytes>) -> Result<CreateInvoiceAttach
         .ok_or(Error::MissingFilename)?
         .to_string();
 
-    let cont = field.contents.clone();
-    let hash = tokio::task::spawn_blocking(move || hex::encode(Sha256::digest(&cont)))
-        .await
-        .unwrap();
-
-    let file_path = format!(
-        "{}/{hash}",
-        std::env::var("ATTACHMENT_PATH").unwrap_or(String::from("."))
-    );
-
-    if tokio::fs::File::open(&file_path).await.is_err() {
-        let mut file = tokio::fs::File::create(&file_path).await?;
-
-        // FIXME: Properly handle write error
-        // as failing here should remove the created file
-        file.write_all(&field.contents).await?;
-    } else {
-        debug!("Skipping duplicate file: {hash}")
-    }
-
-    Ok(CreateInvoiceAttachment {
+    Ok(InvoiceAttachment {
         filename: filename.to_string(),
-        hash,
+        bytes: field.contents.to_vec(),
     })
 }
 
 pub async fn create(
-    mut conn: DatabaseConnection,
     client: MailgunClient,
-    Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<CreateInvoiceForm>>,
-) -> Result<(StatusCode, Json<PopulatedInvoice>), Error> {
+    Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
+) -> Result<(StatusCode, Json<Invoice>), Error> {
+    let orig = multipart.data.clone();
     multipart.data.attachments = stream::iter(
         multipart
             .attachments
@@ -188,12 +132,11 @@ pub async fn create(
     .try_collect::<Vec<_>>()
     .await?;
 
-    let new = conn.create_invoice(multipart.data.clone()).await?;
-    client.send_mail(&new).await?;
+    tokio::task::spawn(async move {
+        if let Err(e) = client.send_mail(multipart.data).await {
+            error!("Sending invoice failed: {}", e);
+        }
+    });
 
-    Ok((StatusCode::CREATED, axum::Json(new)))
-}
-
-pub async fn list_all(mut conn: DatabaseConnection) -> Result<Json<Vec<PopulatedInvoice>>, Error> {
-    Ok(axum::Json(conn.list_invoices().await?))
+    Ok((StatusCode::CREATED, axum::Json(orig)))
 }

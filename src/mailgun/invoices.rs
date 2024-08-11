@@ -1,29 +1,56 @@
 use super::MailgunClient;
-use crate::api::invoices::PopulatedInvoice;
+use crate::api::invoices::Invoice;
 use crate::error::Error;
+use crate::merge::merge_pdf;
+use typst::model::Document;
 
 impl MailgunClient {
-    #[allow(dead_code)]
-    pub async fn send_mail(self, invoice: &PopulatedInvoice) -> Result<(), Error> {
+    pub async fn send_mail(self, invoice: Invoice) -> Result<(), Error> {
+        let document: Document = invoice.to_owned().try_into()?;
+        let pdf = typst_pdf::pdf(&document, typst::foundations::Smart::Auto, None);
+
+        let mut pdfs = vec![pdf];
+        pdfs.extend_from_slice(
+            invoice
+                .attachments
+                .clone()
+                .into_iter()
+                .map(|a| a.bytes)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
+
+        let pdf = merge_pdf(pdfs)?;
+
         let invoice_recipient = format!("{} <{}>", invoice.recipient_name, invoice.recipient_email);
         let form = reqwest::multipart::Form::new()
             .text("from", self.from)
             .text("to", self.default_to)
             .text("cc", invoice_recipient)
-            .text("subject", format!("Uusi lasku #{}", invoice.id))
-            .text("html", format!("Uusi lasku #{}", invoice.id));
+            .text(
+                "subject",
+                format!("Uusi lasku, lähettäjä {}", invoice.recipient_name),
+            )
+            .text(
+                "html",
+                format!("Uusi lasku, lähettäjä {}", invoice.recipient_name),
+            )
+            .part(
+                "attachment",
+                reqwest::multipart::Part::bytes(pdf).file_name("invoice.pdf"),
+            );
 
         let form = invoice
             .attachments
-            .iter()
+            .into_iter()
             .try_fold(form, |form, attachment| {
-                let path = std::env::var("ATTACHMENT_PATH").unwrap_or(String::from("."));
-                let path = std::path::Path::new(&path).join(&attachment.hash);
-                let bytes = std::fs::read(path)?;
-                Ok::<reqwest::multipart::Form, Error>(form.part(
-                    "attachment",
-                    reqwest::multipart::Part::bytes(bytes).file_name(attachment.filename.clone()),
-                ))
+                Ok::<reqwest::multipart::Form, Error>(
+                    form.part(
+                        "attachment",
+                        reqwest::multipart::Part::bytes(attachment.bytes)
+                            .file_name(attachment.filename.clone()),
+                    ),
+                )
             })?;
 
         let response = self

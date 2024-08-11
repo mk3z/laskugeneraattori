@@ -17,35 +17,18 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_DB: laskugeneraattori
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - name: Install Diesel
-        run: cargo install diesel_cli --features=postgres
-      - name: Create Test DB
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost/laskugeneraattori
-        run: diesel migration run
 
       - name: Run tests
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost/laskugeneraattori
+          MAILGUN_URL: https://api.eu.mailgun.net/v3/laskutus.tietokilta.fi/messages
+          MAILGUN_USER: api
+          MAILGUN_PASSWORD: password
+          MAILGUN_TO: Rahastonhoitaja <rahastonhoitaja@tietokilta.fi>
+          MAILGUN_FROM: noreply@laskutus.tietokilta.fi
         run: cargo test
 
   fmt:
