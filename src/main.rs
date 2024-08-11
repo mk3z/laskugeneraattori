@@ -28,7 +28,18 @@ async fn main() {
 
     let state = state::new().await;
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let ip = if std::env::var("EXPOSE").unwrap_or("0".into()) == "1" {
+        [0, 0, 0, 0]
+    } else {
+        [127, 0, 0, 1]
+    };
+
+    let addr = SocketAddr::from((
+        ip,
+        std::env::var("PORT")
+            .map(|p| p.parse::<u16>().unwrap())
+            .unwrap_or(3000),
+    ));
     debug!("Listening on {addr}");
     let listener = tokio::net::TcpListener::bind(addr)
         .await
