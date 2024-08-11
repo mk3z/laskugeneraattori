@@ -26,6 +26,8 @@ diesel::table! {
         filename -> Varchar,
         #[max_length = 64]
         hash -> Varchar,
+        #[max_length = 512]
+        description -> Varchar,
     }
 }
 
@@ -57,6 +59,12 @@ diesel::table! {
         #[max_length = 128]
         bank_account_number -> Varchar,
         address_id -> Int4,
+        #[max_length = 128]
+        subject -> Varchar,
+        #[max_length = 512]
+        description -> Varchar,
+        #[max_length = 32]
+        phone_number -> Varchar,
     }
 }
 
