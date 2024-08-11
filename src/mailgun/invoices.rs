@@ -13,7 +13,6 @@ impl MailgunClient {
         pdfs.extend_from_slice(
             invoice
                 .attachments
-                .clone()
                 .into_iter()
                 .map(|a| a.bytes)
                 .collect::<Vec<_>>()
@@ -39,19 +38,6 @@ impl MailgunClient {
                 "attachment",
                 reqwest::multipart::Part::bytes(pdf).file_name("invoice.pdf"),
             );
-
-        let form = invoice
-            .attachments
-            .into_iter()
-            .try_fold(form, |form, attachment| {
-                Ok::<reqwest::multipart::Form, Error>(
-                    form.part(
-                        "attachment",
-                        reqwest::multipart::Part::bytes(attachment.bytes)
-                            .file_name(attachment.filename.clone()),
-                    ),
-                )
-            })?;
 
         let response = self
             .client

@@ -16,6 +16,8 @@ pub enum Error {
     MultipartRejection(#[from] axum::extract::multipart::MultipartRejection),
     #[error("Missing filename multipart")]
     MissingFilename,
+    #[error("Unsupported file format: {0}")]
+    UnsupportedFileFormat(String),
     #[error("Error in handling json value")]
     JsonRejection(#[from] axum::extract::rejection::JsonRejection),
     #[error("Error while parsing json")]
@@ -43,7 +45,8 @@ impl IntoResponse for Error {
             | Error::MissingFilename
             | Error::MultipartError(_)
             | Error::MultipartRejection(_)
-            | Error::JsonRejection(_) => StatusCode::BAD_REQUEST,
+            | Error::JsonRejection(_)
+            | Error::UnsupportedFileFormat(_) => StatusCode::BAD_REQUEST,
             Error::TypstError => StatusCode::INTERNAL_SERVER_ERROR,
         };
 

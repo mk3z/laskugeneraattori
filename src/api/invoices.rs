@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use crate::error::Error;
 use crate::mailgun::MailgunClient;
 use axum::{async_trait, body::Bytes, http::StatusCode, Json};
@@ -6,9 +8,12 @@ use axum_typed_multipart::{
 };
 use axum_valid::Garde;
 use futures::stream::Stream;
-use futures::stream::{self, TryStreamExt};
 use garde::Validate;
+use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
+
+static ALLOWED_FILENAME: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\.(jpg|jpeg|png|gif|svg|pdf)$").unwrap());
 
 #[async_trait]
 impl TryFromChunks for Invoice {
@@ -98,7 +103,7 @@ pub struct InvoiceAttachment {
     pub bytes: Vec<u8>,
 }
 
-async fn try_handle_file(field: &FieldData<Bytes>) -> Result<InvoiceAttachment, Error> {
+fn try_handle_file(field: FieldData<Bytes>) -> Result<InvoiceAttachment, Error> {
     let filename = field
         .metadata
         .file_name
@@ -106,8 +111,12 @@ async fn try_handle_file(field: &FieldData<Bytes>) -> Result<InvoiceAttachment, 
         .ok_or(Error::MissingFilename)?
         .to_string();
 
+    if !ALLOWED_FILENAME.is_match(&filename) {
+        return Err(Error::UnsupportedFileFormat(filename));
+    }
+
     Ok(InvoiceAttachment {
-        filename: filename.to_string(),
+        filename,
         bytes: field.contents.to_vec(),
     })
 }
@@ -117,20 +126,13 @@ pub async fn create(
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<InvoiceForm>>,
 ) -> Result<(StatusCode, Json<Invoice>), Error> {
     let orig = multipart.data.clone();
-    multipart.data.attachments = stream::iter(
+    multipart.data.attachments = Result::from_iter(
         multipart
             .attachments
-            .iter()
+            .into_iter()
             .map(try_handle_file)
-            .map(Ok)
-            // NOTE: This collect might seem harmless but
-            // I dare you to try removing it
             .collect::<Vec<_>>(),
-    )
-    // FIXME: Don't hardcode buffer size
-    .try_buffer_unordered(50)
-    .try_collect::<Vec<_>>()
-    .await?;
+    )?;
 
     tokio::task::spawn(async move {
         if let Err(e) = client.send_mail(multipart.data).await {

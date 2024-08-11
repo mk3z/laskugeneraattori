@@ -117,7 +117,7 @@
 )
 
 #for file in data.attachments {
-  if regex(".*\.(jpg|png)$") in file.filename {
+  if regex("(?i)\.(jpg|jpeg|png|gif|svg)$") in file.filename {
     pagebreak()
     image("/attachments/" + file.filename)
   }
