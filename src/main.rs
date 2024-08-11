@@ -3,17 +3,11 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 use std::net::SocketAddr;
 
 mod api;
-mod database;
 mod error;
 mod mailgun;
-mod models;
 mod state;
 
-#[cfg(feature = "pdfgen")]
 mod pdfgen;
-
-#[rustfmt::skip]
-mod schema;
 
 #[cfg(test)]
 mod tests;

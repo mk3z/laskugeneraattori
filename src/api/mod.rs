@@ -1,27 +1,16 @@
-use axum::{extract::DefaultBodyLimit, routing::get, Router};
+use axum::{extract::DefaultBodyLimit, routing::get, routing::post, Router};
 use tower_http::{limit::RequestBodyLimitLayer, trace::TraceLayer};
 
 pub mod invoices;
 
-#[cfg(feature = "pdfgen")]
-pub mod pdf;
-
 pub fn app() -> Router<crate::state::State> {
-    let mut router = Router::new()
+    Router::new()
         .route("/health", get(health))
-        .route("/invoices", get(invoices::list_all).post(invoices::create));
-
-    #[cfg(feature = "pdfgen")]
-    {
-        router = router.route("/invoices/:id/pdf", get(pdf::pdf));
-    }
-
-    router
+        .route("/invoices", post(invoices::create))
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::disable())
-        .layer(RequestBodyLimitLayer::new(
-            250 * 1024 * 1024, /* 250mb */
-        ))
+        // Limit the body to 24 MiB since the email is limited to 25 MiB
+        .layer(RequestBodyLimitLayer::new(24 * 1024 * 1024))
 }
 
 async fn health() {}

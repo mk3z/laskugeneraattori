@@ -1,21 +1,14 @@
 use crate::mailgun::MailgunClient;
 use axum::extract::FromRef;
-use diesel_async::{
-    pooled_connection::AsyncDieselConnectionManager, AsyncConnection, AsyncPgConnection,
-};
 
 #[derive(FromRef, Clone)]
 pub struct State {
-    pub pool: bb8::Pool<AsyncDieselConnectionManager<AsyncPgConnection>>,
     pub mailgun_client: MailgunClient,
     pub for_garde: (),
 }
 
 pub async fn new() -> State {
     dotenv::dotenv().ok();
-
-    let db_url = std::env::var("DATABASE_URL").expect("No DATABASE_URL in env");
-    let config = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(db_url);
 
     let mailgun_client = MailgunClient {
         client: reqwest::Client::new(),
@@ -27,24 +20,6 @@ pub async fn new() -> State {
     };
 
     State {
-        pool: if cfg!(test) {
-            let pool = bb8::Pool::builder()
-                .max_size(1)
-                .build(config)
-                .await
-                .expect("Failed to build database pool");
-
-            let mut conn = pool.get_owned().await.expect("Failed to get connection");
-            conn.begin_test_transaction()
-                .await
-                .expect("Failed to begin test transaction");
-            pool
-        } else {
-            bb8::Pool::builder()
-                .build(config)
-                .await
-                .expect("Failed to build database pool")
-        },
         mailgun_client,
         for_garde: (),
     }
