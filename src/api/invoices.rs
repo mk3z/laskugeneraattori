@@ -1,5 +1,6 @@
-use crate::database::{DatabaseConnection, MailgunClient};
+use crate::database::DatabaseConnection;
 use crate::error::Error;
+use crate::mailgun::MailgunClient;
 use crate::models::{Address, Attachment, Invoice, InvoiceRow};
 use axum::{async_trait, body::Bytes, http::StatusCode, Json};
 use axum_typed_multipart::{
@@ -169,6 +170,7 @@ async fn try_handle_file(field: &FieldData<Bytes>) -> Result<CreateInvoiceAttach
 
 pub async fn create(
     mut conn: DatabaseConnection,
+    client: MailgunClient,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<CreateInvoiceForm>>,
 ) -> Result<(StatusCode, Json<PopulatedInvoice>), Error> {
     multipart.data.attachments = stream::iter(
@@ -186,52 +188,12 @@ pub async fn create(
     .try_collect::<Vec<_>>()
     .await?;
 
-    Ok((
-        StatusCode::CREATED,
-        axum::Json(conn.create_invoice(multipart.data.clone()).await?),
-    ))
+    let new = conn.create_invoice(multipart.data.clone()).await?;
+    client.send_mail(&new).await?;
+
+    Ok((StatusCode::CREATED, axum::Json(new)))
 }
 
 pub async fn list_all(mut conn: DatabaseConnection) -> Result<Json<Vec<PopulatedInvoice>>, Error> {
     Ok(axum::Json(conn.list_invoices().await?))
-}
-
-#[allow(dead_code)]
-pub async fn send_mail(
-    mailgun_client: MailgunClient,
-    invoice: &PopulatedInvoice,
-) -> Result<(), Error> {
-    let invoice_recipient = format!("{} <{}>", invoice.recipient_name, invoice.recipient_email);
-    let form = reqwest::multipart::Form::new()
-        .text("from", mailgun_client.from)
-        .text("to", mailgun_client.default_to)
-        .text("cc", invoice_recipient)
-        .text("subject", format!("Uusi lasku #{}", invoice.id))
-        .text("html", format!("Uusi lasku #{}", invoice.id));
-
-    let form = invoice
-        .attachments
-        .iter()
-        .try_fold(form, |form, attachment| {
-            let path = std::env::var("ATTACHMENT_PATH").unwrap_or(String::from("."));
-            let path = std::path::Path::new(&path).join(&attachment.hash);
-            let bytes = std::fs::read(path)?;
-            Ok::<reqwest::multipart::Form, Error>(form.part(
-                "attachment",
-                reqwest::multipart::Part::bytes(bytes).file_name(attachment.filename.clone()),
-            ))
-        })?;
-
-    let response = mailgun_client
-        .client
-        .post(mailgun_client.url)
-        .basic_auth(mailgun_client.api_user, Some(mailgun_client.api_key))
-        .multipart(form)
-        .send()
-        .await?;
-
-    match response.error_for_status() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::ReqwestError(e)),
-    }
 }

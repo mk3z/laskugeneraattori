@@ -8,7 +8,7 @@ mod invoices;
 
 #[tokio::test]
 async fn health() {
-    let app = app().with_state(crate::database::new().await);
+    let app = app().with_state(crate::state::new().await);
 
     let response = app
         .oneshot(
