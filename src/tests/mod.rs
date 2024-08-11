@@ -4,8 +4,6 @@ use axum::http::request::Request;
 use axum::http::StatusCode;
 use tower::ServiceExt;
 
-mod invoices;
-
 #[tokio::test]
 async fn health() {
     let app = app().with_state(crate::state::new().await);
