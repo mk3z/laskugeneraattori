@@ -1,4 +1,4 @@
-use crate::database::DatabaseConnection;
+use crate::database::{DatabaseConnection, MailgunClient};
 use crate::error::Error;
 use crate::models::{Address, Attachment, Invoice, InvoiceRow};
 use axum::{async_trait, body::Bytes, http::StatusCode, Json};
@@ -197,21 +197,15 @@ pub async fn list_all(mut conn: DatabaseConnection) -> Result<Json<Vec<Populated
 }
 
 #[allow(dead_code)]
-pub async fn send_mail(invoice: &PopulatedInvoice) -> Result<(), Error> {
-    let client = reqwest::Client::new();
+pub async fn send_mail(
+    mailgun_client: MailgunClient,
+    invoice: &PopulatedInvoice,
+) -> Result<(), Error> {
+    let invoice_recipient = format!("{} <{}>", invoice.recipient_name, invoice.recipient_email);
     let form = reqwest::multipart::Form::new()
-        .text(
-            "from",
-            std::env::var("MAILGUN_FROM").unwrap_or(String::from("")),
-        )
-        .text(
-            "to",
-            format!("{} <{}>", invoice.recipient_name, invoice.recipient_email),
-        )
-        .text(
-            "to",
-            std::env::var("MAILGUN_TO").unwrap_or(String::from("")),
-        )
+        .text("from", mailgun_client.from)
+        .text("to", mailgun_client.default_to)
+        .text("cc", invoice_recipient)
         .text("subject", format!("Uusi lasku #{}", invoice.id))
         .text("html", format!("Uusi lasku #{}", invoice.id));
 
@@ -228,12 +222,10 @@ pub async fn send_mail(invoice: &PopulatedInvoice) -> Result<(), Error> {
             ))
         })?;
 
-    let response = client
-        .post(std::env::var("MAILGUN_URL").unwrap_or(String::from("")))
-        .basic_auth(
-            std::env::var("MAILGUN_USER").unwrap_or(String::from("")),
-            Some(std::env::var("MAILGUN_PASSWORD").unwrap_or(String::from(""))),
-        )
+    let response = mailgun_client
+        .client
+        .post(mailgun_client.url)
+        .basic_auth(mailgun_client.api_user, Some(mailgun_client.api_key))
         .multipart(form)
         .send()
         .await?;
