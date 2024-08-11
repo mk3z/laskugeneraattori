@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 mod api;
 mod error;
 mod mailgun;
+mod merge;
 mod state;
 
 mod pdfgen;
