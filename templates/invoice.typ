@@ -34,7 +34,7 @@
 
 #set page(
   background: [
-    #image("tik.png")
+    #image("/tik.png")
   ],
   footer: [
     Laskut hyväksytään Tietokillan hallituksen kokouksissa.
@@ -88,8 +88,7 @@
 
 #colbreak()
 = LASKU
-*ID*: #data.id \
-*Päivämäärä*: #data.creation_time \
+*Päivämäärä*: #datetime.today().display() \
 ]
 
 == Tietokilta
@@ -112,12 +111,14 @@
 === LIITTEET
 #table(columns: (33%, 66%),
   table.header([*Tiedosto*], [*Kuvaus*]),
-  ..data.attachments.map(a => (a.filename, a.description)).flatten()
+  ..data.attachments
+    .zip(data.attachment_descriptions)
+    .map(((a, d)) => (a.filename, d)).flatten()
 )
 
 #for file in data.attachments {
   if regex(".*\.(jpg|png)$") in file.filename {
     pagebreak()
-    image(file.hash + "/" + file.filename)
+    image("/attachments/" + file.filename)
   }
 }

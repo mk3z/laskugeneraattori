@@ -1,4 +1,4 @@
-use crate::{api::invoices::PopulatedInvoice, error::Error};
+use crate::{api::invoices::Invoice, error::Error};
 use comemo::Prehashed;
 use std::{
     cell::{RefCell, RefMut},
@@ -11,7 +11,7 @@ use typst::{
     eval::Tracer,
     foundations::{Bytes, Datetime, IntoValue},
     model::Document,
-    syntax::{FileId, Source},
+    syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
     Library, World,
 };
@@ -117,7 +117,6 @@ struct Sandbox {
     book: Prehashed<FontBook>,
     fonts: Vec<FontSlot>,
 
-    root: PathBuf,
     files: RefCell<HashMap<FileId, FileEntry>>,
     time: time::OffsetDateTime,
 }
@@ -126,31 +125,31 @@ impl Sandbox {
     fn new() -> Self {
         let (book, fonts) = fonts();
 
-        Self {
+        let new = Self {
             library: Prehashed::new(Library::builder().build()),
             book: Prehashed::new(book),
             fonts,
-            root: PathBuf::new(),
             source: Source::detached(include_str!("../../templates/invoice.typ")),
             time: time::OffsetDateTime::now_utc(),
             files: RefCell::new(HashMap::new()),
-        }
+        };
+
+        new.files.borrow_mut().insert(
+            FileId::new(None, VirtualPath::new("/tik.png")),
+            FileEntry::new(include_bytes!("../../templates/tik.png").to_vec(), None),
+        );
+
+        new
     }
 
     fn sandbox_file(&self, id: FileId) -> FileResult<RefMut<'_, FileEntry>> {
         if let Ok(entry) = RefMut::filter_map(self.files.borrow_mut(), |files| files.get_mut(&id)) {
-            return Ok(entry);
+            Ok(entry)
+        } else {
+            Err(FileError::NotFound(
+                id.vpath().as_rootless_path().to_path_buf(),
+            ))
         }
-
-        let path = id
-            .vpath()
-            .resolve(&self.root)
-            .ok_or(FileError::AccessDenied)?;
-
-        let content = std::fs::read(&path).map_err(|error| FileError::from_io(error, &path))?;
-        Ok(RefMut::map(self.files.borrow_mut(), |files| {
-            files.entry(id).or_insert(FileEntry::new(content, None))
-        }))
     }
 
     fn with_data(&self, data: impl IntoValue) -> Self {
@@ -199,40 +198,32 @@ impl World for Sandbox {
     }
 }
 
-impl IntoValue for PopulatedInvoice {
+impl IntoValue for Invoice {
     fn into_value(self) -> typst::foundations::Value {
         serde_json::from_str(&serde_json::to_string(&self).unwrap()).unwrap()
     }
 }
 
-impl TryInto<Document> for PopulatedInvoice {
+impl TryInto<Document> for Invoice {
     type Error = Error;
 
     fn try_into(self) -> Result<Document, Error> {
-        let mut w = WORLD.with_borrow(|w| w.with_data(self.clone()));
-        let tempdir = tempdir::TempDir::new("laskugeneraattori")?;
-        w.root = tempdir.path().to_path_buf();
-        let attachment_path =
-            PathBuf::from(std::env::var("ATTACHMENT_PATH").unwrap_or(String::from(".")));
-
-        // NOTE: We would want to use hard-links
-        // but the TempDir is not guaranteed to be on the same device
-        std::fs::copy("templates/tik.png", tempdir.path().join("tik.png"))?;
-
-        self.attachments.iter().try_for_each(|attachment| {
-            std::fs::create_dir(tempdir.path().join(&attachment.hash))?;
-            std::fs::copy(
-                attachment_path.join(&attachment.hash),
-                tempdir
-                    .path()
-                    .join(&attachment.hash)
-                    .join(&attachment.filename),
-            )?;
-            Ok::<(), Error>(())
-        })?;
+        let w = WORLD.with_borrow(|w| w.with_data(self.clone()));
+        self.attachments.into_iter().for_each(|a| {
+            w.files.borrow_mut().insert(
+                FileId::new(
+                    None,
+                    VirtualPath::new("/attachments/".to_owned() + &a.filename),
+                ),
+                FileEntry::new(a.bytes, None),
+            );
+        });
 
         let mut tracer = Tracer::default();
-        let template = typst::compile(&w, &mut tracer).map_err(|_| Error::TypstError)?;
+        let template = typst::compile(&w, &mut tracer).map_err(|e| {
+            dbg!(e);
+            Error::TypstError
+        })?;
 
         Ok(template)
     }
