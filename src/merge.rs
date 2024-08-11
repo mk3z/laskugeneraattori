@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 
 use lopdf::{Document, Object, ObjectId};
 
-#[allow(dead_code)]
 // Mostly copied from https://github.com/J-F-Liu/lopdf/blob/master/README.md merge example
 pub fn merge_pdf(documents: Vec<Vec<u8>>) -> Result<Vec<u8>, Error> {
     let documents = documents
