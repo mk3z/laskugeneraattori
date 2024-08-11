@@ -5,7 +5,9 @@ use std::net::SocketAddr;
 mod api;
 mod database;
 mod error;
+mod mailgun;
 mod models;
+mod state;
 
 #[cfg(feature = "pdfgen")]
 mod pdfgen;
@@ -29,7 +31,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let state = database::new().await;
+    let state = state::new().await;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     debug!("Listening on {addr}");

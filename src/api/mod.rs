@@ -6,7 +6,7 @@ pub mod invoices;
 #[cfg(feature = "pdfgen")]
 pub mod pdf;
 
-pub fn app() -> Router<crate::database::State> {
+pub fn app() -> Router<crate::state::State> {
     let mut router = Router::new()
         .route("/health", get(health))
         .route("/invoices", get(invoices::list_all).post(invoices::create));

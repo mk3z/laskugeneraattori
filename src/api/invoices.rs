@@ -1,5 +1,6 @@
 use crate::database::DatabaseConnection;
 use crate::error::Error;
+use crate::mailgun::MailgunClient;
 use crate::models::{Address, Attachment, Invoice, InvoiceRow};
 use axum::{async_trait, body::Bytes, http::StatusCode, Json};
 use axum_typed_multipart::{
@@ -169,6 +170,7 @@ async fn try_handle_file(field: &FieldData<Bytes>) -> Result<CreateInvoiceAttach
 
 pub async fn create(
     mut conn: DatabaseConnection,
+    client: MailgunClient,
     Garde(TypedMultipart(mut multipart)): Garde<TypedMultipart<CreateInvoiceForm>>,
 ) -> Result<(StatusCode, Json<PopulatedInvoice>), Error> {
     multipart.data.attachments = stream::iter(
@@ -186,10 +188,10 @@ pub async fn create(
     .try_collect::<Vec<_>>()
     .await?;
 
-    Ok((
-        StatusCode::CREATED,
-        axum::Json(conn.create_invoice(multipart.data.clone()).await?),
-    ))
+    let new = conn.create_invoice(multipart.data.clone()).await?;
+    client.send_mail(&new).await?;
+
+    Ok((StatusCode::CREATED, axum::Json(new)))
 }
 
 pub async fn list_all(mut conn: DatabaseConnection) -> Result<Json<Vec<PopulatedInvoice>>, Error> {

@@ -22,7 +22,7 @@ async fn test_init() -> Router {
             .with(tracing_subscriber::fmt::layer())
             .init()
     });
-    app().with_state(crate::database::new().await)
+    app().with_state(crate::state::new().await)
 }
 
 #[tokio::test]
