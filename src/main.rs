@@ -45,7 +45,12 @@ async fn main() {
         .await
         .expect("Failed to bind TcpListener");
 
-    axum::serve(listener, api::app().with_state(state))
-        .await
-        .expect("Failed to start server");
+    axum::serve(
+        listener,
+        api::app()
+            .with_state(state)
+            .into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .expect("Failed to start server");
 }
