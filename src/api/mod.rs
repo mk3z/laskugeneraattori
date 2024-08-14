@@ -3,16 +3,15 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use tower_http::{limit::RequestBodyLimitLayer, trace::TraceLayer, cors::CorsLayer};
+use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLayer};
 
 pub mod invoices;
 
 pub fn app() -> Router<crate::state::State> {
-    let cors_layer = CorsLayer::new()
-        .allow_origin([
-            "https://tietokilta.fi".parse().unwrap(),
-            "http://localhost:3000".parse().unwrap(),
-        ]);
+    let cors_layer = CorsLayer::new().allow_origin([
+        "https://tietokilta.fi".parse().unwrap(),
+        "http://localhost:3000".parse().unwrap(),
+    ]);
 
     Router::new()
         .route("/health", get(health))
