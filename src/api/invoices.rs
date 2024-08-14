@@ -9,6 +9,7 @@ use axum_typed_multipart::{
 use axum_valid::Garde;
 use futures::stream::Stream;
 use garde::Validate;
+use iban::Iban;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 
@@ -24,6 +25,13 @@ impl TryFromChunks for Invoice {
         let bytes = Bytes::try_from_chunks(chunks, metadata).await?;
 
         serde_json::from_slice(&bytes).map_err(|e| TypedMultipartError::Other { source: e.into() })
+    }
+}
+
+fn is_valid_iban(value: &str, _: &()) -> garde::Result {
+    match value.parse::<Iban>() {
+        Err(e) => Err(garde::Error::new(e)),
+        _ => Ok(()),
     }
 }
 
@@ -51,7 +59,7 @@ pub struct Invoice {
     pub address: Address,
     /// The recipient's bank account number
     // TODO: maybe validate with https://crates.io/crates/iban_validate/
-    #[garde(byte_length(max = 128))]
+    #[garde(byte_length(max = 128), custom(is_valid_iban))]
     pub bank_account_number: String,
     #[garde(byte_length(min = 1, max = 128))]
     pub subject: String,
