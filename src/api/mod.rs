@@ -46,4 +46,6 @@ pub fn app() -> Router<crate::state::State> {
         })
 }
 
-async fn health() {}
+async fn health() -> &'static str {
+    "OK"
+}
