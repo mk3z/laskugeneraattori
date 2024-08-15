@@ -20,29 +20,29 @@ axum-valid = { version = "0.14.0", features = [
     "typed_multipart",
 ], default-features = false }
 axum_typed_multipart = "0.11.0"
+comemo = { version = "0.4.0" }
 dotenv = "0.15.0"
-serde = "1.0.195"
-serde_derive = "1.0.195"
-thiserror = "1.0.56"
-tokio = { version = "1.35.1", features = ["full"] }
-tower-http = { version = "0.5.1", features = ["trace", "limit", "cors"] }
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-serde_json = "1.0.111"
+fontdb = { version = "0.17.0", optional = true }
 futures = "0.3.30"
 garde = "0.17.0"
-typst = { version = "0.11.1" }
-typst-pdf = { version = "0.11.1" }
-comemo = { version = "0.4.0" }
-time = { version = "0.3.36" }
-fontdb = { version = "0.17.0", optional = true }
-typst-assets = { version = "0.11.1", features = ["fonts"] }
-reqwest = { version = "0.12.5", default-features = false, features = ["multipart", "rustls-tls"] }
+iban_validate = "4.0.1"
 lopdf = "0.33.0"
 regex = "1.10.6"
+reqwest = { version = "0.12.5", default-features = false, features = ["multipart", "rustls-tls"] }
+serde = "1.0.195"
+serde_derive = "1.0.195"
+serde_json = "1.0.111"
+thiserror = "1.0.56"
+time = { version = "0.3.36" }
+tokio = { version = "1.35.1", features = ["full"] }
+tower-http = { version = "0.5.1", features = ["trace", "limit", "cors"] }
 tower_governor = { version = "0.4.2", features = ["axum"] }
-iban_validate = "4.0.1"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+typst = { version = "0.11.1" }
+typst-assets = { version = "0.11.1", features = ["fonts"] }
+typst-pdf = { version = "0.11.1" }
 
 [dev-dependencies]
-tower = { version = "0.4.13", features = ["util"] }
 axum-test = "14.2.2"
+tower = { version = "0.4.13", features = ["util"] }
