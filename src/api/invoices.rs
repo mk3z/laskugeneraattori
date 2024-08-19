@@ -50,7 +50,7 @@ pub struct Invoice {
     pub bank_account_number: String,
     #[garde(byte_length(min = 1, max = 128))]
     pub subject: String,
-    #[garde(byte_length(max = 512))]
+    #[garde(byte_length(max = 4096))]
     pub description: String,
     #[garde(phone_number, byte_length(max = 32))]
     pub phone_number: String,
