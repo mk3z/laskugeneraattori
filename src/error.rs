@@ -38,7 +38,7 @@ impl IntoResponse for Error {
         error!(%self);
 
         let status = match self {
-            Error::InternalServerError(_) | Error::ReqwestError(_) => {
+            Error::InternalServerError(_) | Error::ReqwestError(_) | Error::TypstError => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
             Error::JsonError(_)
@@ -47,7 +47,6 @@ impl IntoResponse for Error {
             | Error::MultipartRejection(_)
             | Error::JsonRejection(_)
             | Error::UnsupportedFileFormat(_) => StatusCode::BAD_REQUEST,
-            Error::TypstError => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         (

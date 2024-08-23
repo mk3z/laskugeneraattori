@@ -142,11 +142,6 @@ pub async fn create(
             .collect::<Vec<_>>(),
     )?;
 
-    tokio::task::spawn(async move {
-        if let Err(e) = client.send_mail(multipart.data).await {
-            error!("Sending invoice failed: {}", e);
-        }
-    });
-
+    client.send_mail(multipart.data).await?;
     Ok((StatusCode::CREATED, axum::Json(orig)))
 }
