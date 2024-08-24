@@ -1,6 +1,6 @@
 use axum::{
     extract::DefaultBodyLimit,
-    http::Method,
+    http::{HeaderValue, Method},
     routing::{get, post},
     Router,
 };
@@ -12,10 +12,13 @@ use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, trace::TraceLaye
 pub mod invoices;
 
 pub fn app() -> Router<crate::state::State> {
-    let cors_layer = CorsLayer::new().allow_origin([
-        "https://tietokilta.fi".parse().unwrap(),
-        "http://localhost:3000".parse().unwrap(),
-    ]);
+    let cors_layer = CorsLayer::new().allow_origin(
+        crate::CONFIG
+            .allowed_origins
+            .iter()
+            .map(|c| c.parse::<HeaderValue>().unwrap())
+            .collect::<Vec<_>>(),
+    );
 
     let governor_config = Arc::new(
         GovernorConfigBuilder::default()
