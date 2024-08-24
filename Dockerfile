@@ -20,6 +20,7 @@ RUN touch src/main.rs
 RUN cargo build --release
 
 FROM alpine as runtime
+ENV BIND_ADDR 0.0.0.0
 WORKDIR /app
 COPY --from=builder /app/target/release/laskugeneraattori app
 EXPOSE 5237
