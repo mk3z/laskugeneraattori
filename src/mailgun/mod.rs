@@ -7,14 +7,27 @@ use axum::{
 
 mod invoices;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MailgunClient {
-    pub client: reqwest::Client,
-    pub url: String,
-    pub api_user: String,
-    pub api_key: String,
-    pub default_to: String,
-    pub from: String,
+    client: reqwest::Client,
+    url: String,
+    api_user: String,
+    api_key: String,
+    default_to: String,
+    from: String,
+}
+
+impl From<crate::MailgunConfig> for MailgunClient {
+    fn from(config: crate::MailgunConfig) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            url: config.url,
+            api_user: config.user,
+            api_key: config.password,
+            default_to: config.to,
+            from: config.from,
+        }
+    }
 }
 
 #[async_trait]

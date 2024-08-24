@@ -1,6 +1,8 @@
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+use clap::Parser;
 use std::net::SocketAddr;
+use std::sync::LazyLock;
 
 mod api;
 mod error;
@@ -16,6 +18,43 @@ mod tests;
 #[macro_use]
 extern crate tracing;
 
+#[derive(Parser, Clone, Debug)]
+struct MailgunConfig {
+    /// Url used by mailgun
+    #[clap(long = "mailgun-url", env = "MAILGUN_URL")]
+    url: String,
+    /// Username used by mailgun
+    #[clap(long = "mailgun-user", env = "MAILGUN_USER")]
+    user: String,
+    /// Password used by mailgun
+    #[clap(long = "mailgun-password", env = "MAILGUN_PASSWORD")]
+    password: String,
+    /// Initial To-value used by mailgun
+    #[clap(long = "mailgun-to", env = "MAILGUN_TO")]
+    to: String,
+    /// From-value used by mailgun
+    #[clap(long = "mailgun-from", env = "MAILGUN_FROM")]
+    from: String,
+}
+
+#[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None)]
+struct LaskugenConfig {
+    #[clap(flatten)]
+    mailgun: MailgunConfig,
+    /// The listen port for the HTTP server
+    #[clap(long, env, required = false, default_value = "3000")]
+    port: u16,
+    /// The ip address to bound by the HTTP server
+    #[clap(long, env, required = false, default_value = "127.0.0.1")]
+    bind_addr: std::net::IpAddr,
+    /// A comma-separated list of allowed origins
+    #[clap(long, env, required = false, value_delimiter = ',')]
+    allowed_origins: Vec<String>,
+}
+
+static CONFIG: LazyLock<LaskugenConfig> = LazyLock::new(LaskugenConfig::parse);
+
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
@@ -27,19 +66,7 @@ async fn main() {
         .init();
 
     let state = state::new().await;
-
-    let ip = if std::env::var("EXPOSE").unwrap_or("0".into()) == "1" {
-        [0, 0, 0, 0]
-    } else {
-        [127, 0, 0, 1]
-    };
-
-    let addr = SocketAddr::from((
-        ip,
-        std::env::var("PORT")
-            .map(|p| p.parse::<u16>().unwrap())
-            .unwrap_or(3000),
-    ));
+    let addr = SocketAddr::from((CONFIG.bind_addr, CONFIG.port));
     debug!("Listening on {addr}");
     let listener = tokio::net::TcpListener::bind(addr)
         .await
