@@ -16,7 +16,7 @@ pub enum Error {
     MultipartRejection(#[from] axum::extract::multipart::MultipartRejection),
     #[error("Missing filename multipart")]
     MissingFilename,
-    #[error("Unsupported file format: {0}")]
+    #[error("Unsupported file format: {0}. Supported file formats are (jpg|jpeg|png|gif|svg|pdf)")]
     UnsupportedFileFormat(String),
     #[error("Error in handling json value")]
     JsonRejection(#[from] axum::extract::rejection::JsonRejection),
