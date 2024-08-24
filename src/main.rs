@@ -53,7 +53,7 @@ struct LaskugenConfig {
     allowed_origins: Vec<String>,
 }
 
-static CONFIG: LazyLock<LaskugenConfig> = LazyLock::new(|| LaskugenConfig::parse());
+static CONFIG: LazyLock<LaskugenConfig> = LazyLock::new(LaskugenConfig::parse);
 
 #[tokio::main]
 async fn main() {
