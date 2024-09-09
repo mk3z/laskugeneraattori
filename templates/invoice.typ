@@ -1,34 +1,24 @@
-// https://github.com/typst/typst/issues/3269
 #let price(number) = {
-  let chunks = ()
-  let integer = int(number)
-  while integer > 1000 {
-    let n = str(int(calc.rem(integer, 1000)))
-    let chunk = ""
-    for i in range(3 - n.len()) {
-      chunk += "0"
-    }
-    chunk += n
-    chunks.push(chunk)
-    integer = int(integer / 1000);
+  let digits = ""
+  while number > 0 {
+    digits += str(calc.rem(number, 10))
+    number = int(number/10)
   }
-
-  chunks.push(str(integer))
 
   let s = ""
-  for chunk in chunks.rev() {
-    s += str(chunk)
-    s += " "
-  }
-  s = s.slice(0, s.len() -1)
+  let n = 0
+  for d in digits {
+    if n == 2 {
+      s = "," + s
+    }
 
-  let decimal = str(int(calc.rem(number * 100, 100)))
-  s += ","
+    if n > 2 and calc.rem(n - 2, 3) == 0 {
+      s = " " + s
+    }
 
-  for i in range(2 - decimal.len()){
-    s = s + "0"
+    s = d + s
+    n += 1
   }
-  s += decimal
   s
 }
 
@@ -98,12 +88,12 @@
 
 === Erittely
 #let rows = data.rows.map(it => ([#it.product], [#it.quantity #it.unit],
-      [#price(it.unit_price/100) €], [#price(it.quantity*it.unit_price/100) €]))
+      [#price(it.unit_price) €], [#price(it.quantity*it.unit_price) €]))
 #table(columns: (55%, 15%, 15%, 15%),
   align: (left, right, right, right),
   table.header([*Tuote*], [*Määrä*],  [*Hinta per*], [*Yhteensä*]),
   ..rows.flatten(),
-  ..([], [], [], [*#price(data.rows.map(r => r.unit_price*r.quantity).sum()/100) €*])
+  ..([], [], [], [*#price(data.rows.map(r => r.unit_price*r.quantity).sum()) €*])
 )
 
 *IBAN-tilinumero*: #data.bank_account_number \
