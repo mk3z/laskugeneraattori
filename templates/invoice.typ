@@ -1,25 +1,16 @@
 #let price(number) = {
-  let digits = ""
-  while number > 0 {
-    digits += str(calc.rem(number, 10))
-    number = int(number/10)
+  let num_as_str = str(number)
+  let whole_nums="0"
+  if num_as_str.len() > 2 {
+    whole_nums = num_as_str.slice(0, -2)
   }
-
-  let s = ""
-  let n = 0
-  for d in digits {
-    if n == 2 {
-      s = "," + s
-    }
-
-    if n > 2 and calc.rem(n - 2, 3) == 0 {
-      s = " " + s
-    }
-
-    s = d + s
-    n += 1
+  let rem = "00"
+  if num_as_str.len() == 1 {
+    rem = "0" + num_as_str
+  } else if num_as_str.len() >= 2 {
+    rem = num_as_str.slice(-2)
   }
-  s
+  whole_nums+"."+rem
 }
 
 #set page(
