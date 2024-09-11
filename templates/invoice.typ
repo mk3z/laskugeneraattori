@@ -1,35 +1,16 @@
-// https://github.com/typst/typst/issues/3269
 #let price(number) = {
-  let chunks = ()
-  let integer = int(number)
-  while integer > 1000 {
-    let n = str(int(calc.rem(integer, 1000)))
-    let chunk = ""
-    for i in range(3 - n.len()) {
-      chunk += "0"
-    }
-    chunk += n
-    chunks.push(chunk)
-    integer = int(integer / 1000);
+  let num_as_str = str(number)
+  let whole_nums="0"
+  if num_as_str.len() > 2 {
+    whole_nums = num_as_str.slice(0, -2)
   }
-
-  chunks.push(str(integer))
-
-  let s = ""
-  for chunk in chunks.rev() {
-    s += str(chunk)
-    s += " "
+  let rem = "00"
+  if num_as_str.len() == 1 {
+    rem = "0" + num_as_str
+  } else if num_as_str.len() >= 2 {
+    rem = num_as_str.slice(-2)
   }
-  s = s.slice(0, s.len() -1)
-
-  let decimal = str(int(calc.rem(number * 100, 100)))
-  s += ","
-
-  for i in range(2 - decimal.len()){
-    s = s + "0"
-  }
-  s += decimal
-  s
+  whole_nums+","+rem
 }
 
 #set page(
@@ -98,12 +79,12 @@
 
 === Erittely
 #let rows = data.rows.map(it => ([#it.product], [#it.quantity #it.unit],
-      [#price(it.unit_price/100) €], [#price(it.quantity*it.unit_price/100) €]))
+      [#price(it.unit_price) €], [#price(it.quantity*it.unit_price) €]))
 #table(columns: (55%, 15%, 15%, 15%),
   align: (left, right, right, right),
   table.header([*Tuote*], [*Määrä*],  [*Hinta per*], [*Yhteensä*]),
   ..rows.flatten(),
-  ..([], [], [], [*#price(data.rows.map(r => r.unit_price*r.quantity).sum()/100) €*])
+  ..([], [], [], [*#price(data.rows.map(r => r.unit_price*r.quantity).sum()) €*])
 )
 
 *IBAN-tilinumero*: #data.bank_account_number \
