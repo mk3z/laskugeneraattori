@@ -10,7 +10,7 @@
   } else if num_as_str.len() >= 2 {
     rem = num_as_str.slice(-2)
   }
-  whole_nums+"."+rem
+  whole_nums+","+rem
 }
 
 #set page(
