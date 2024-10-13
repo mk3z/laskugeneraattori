@@ -89,12 +89,17 @@
 
 *IBAN-tilinumero*: #data.bank_account_number \
 
+
 === LIITTEET
-#table(columns: (33%, 66%),
+#table(columns: (1fr, 2fr),
   table.header([*Tiedosto*], [*Kuvaus*]),
   ..data.attachments
     .zip(data.attachment_descriptions)
-    .map(((a, d)) => (a.filename, d)).flatten()
+    .map(((a, d)) => (
+      // NOTE: add breakpoints to the string
+      // so that it can be wrapped to multiple lines
+      a.filename.codepoints().map(x => x + sym.zws).join(),
+    d)).flatten()
 )
 
 #for file in data.attachments {
