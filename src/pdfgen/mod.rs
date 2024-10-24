@@ -9,7 +9,7 @@ use std::{
 use typst::{
     diag::{FileError, FileResult},
     eval::Tracer,
-    foundations::{Bytes, Datetime, IntoValue},
+    foundations::{Bytes, Datetime, IntoValue, Value},
     model::Document,
     syntax::{FileId, Source, VirtualPath},
     text::{Font, FontBook},
@@ -154,8 +154,12 @@ impl Sandbox {
 
     fn with_data(&self, data: impl IntoValue) -> Self {
         let mut new = self.clone();
-        new.library
-            .update(|l| l.global.scope_mut().define("data", data));
+        new.library.update(|l| {
+            let scope = l.global.scope_mut();
+            scope.define("data", data);
+            scope.define("COMMIT_HASH", Value::Str(env!("COMMIT_HASH").into()));
+            scope.define("VERSION", Value::Str(env!("CARGO_PKG_VERSION").into()));
+        });
         new.time = time::OffsetDateTime::now_utc();
         new
     }
