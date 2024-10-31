@@ -49,6 +49,10 @@ pub fn app() -> Router<crate::state::State> {
         })
 }
 
-async fn health() -> &'static str {
-    "OK"
+async fn health() -> String {
+    format!(
+        "Laskugeneraattori {} {}",
+        &env!("CARGO_PKG_VERSION"),
+        &env!("COMMIT_HASH")
+    )
 }
