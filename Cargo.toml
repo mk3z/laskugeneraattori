@@ -8,7 +8,9 @@ authors = ["Luukas Pörtfors <lajp@iki.fi>"]
 lto = true
 
 [features]
+default = ["email"]
 system_fonts = ["dep:fontdb"]
+email = ["dep:reqwest"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -29,10 +31,11 @@ garde = "0.17.0"
 iban_validate = "4.0.1"
 lopdf = { git = "https://github.com/J-F-Liu/lopdf.git", rev = "7f24a1c3ebc42470a37b4315b843331e4f81cdcd" }
 regex = "1.10.6"
-reqwest = { version = "0.12.5", default-features = false, features = ["multipart", "rustls-tls"] }
+reqwest = { version = "0.12.5", default-features = false, features = ["multipart", "rustls-tls"], optional = true }
 serde = "1.0.195"
 serde_derive = "1.0.195"
 serde_json = "1.0.111"
+tempfile = "3.13.0"
 thiserror = "1.0.56"
 time = { version = "0.3.36" }
 tokio = { version = "1.35.1", features = ["full"] }
